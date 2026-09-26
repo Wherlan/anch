@@ -1,6 +1,7 @@
 "use client"
 
-import { LandmarkIcon, CreditCardIcon, SnowflakeIcon } from "lucide-react"
+import { useState } from "react"
+import { LandmarkIcon, CreditCardIcon, SnowflakeIcon, EyeIcon, EyeOffIcon } from "lucide-react"
 import { motion } from "motion/react"
 
 import { cn } from "@/lib/utils"
@@ -24,6 +25,7 @@ function maskAccountNumber(accountNumber: string) {
 
 export function AccountCard({ account, index, onSelect }: AccountCardProps) {
   const isSavings = account.type === "SAVINGS"
+  const [showAccountNumber, setShowAccountNumber] = useState(false)
 
   return (
     <motion.div
@@ -61,9 +63,20 @@ export function AccountCard({ account, index, onSelect }: AccountCardProps) {
           <p className="text-sm font-semibold">
             {account.nickname || (isSavings ? "Savings" : "Checking")}
           </p>
-          <p className="font-mono text-xs text-muted-foreground">
-            {maskAccountNumber(account.accountNumber)}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="font-mono text-xs text-muted-foreground">
+              {showAccountNumber ? account.accountNumber : maskAccountNumber(account.accountNumber)}
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowAccountNumber((shown) => !shown)}
+              className="inline-flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+              aria-label={showAccountNumber ? "Hide account number" : "Show account number"}
+              title={showAccountNumber ? "Hide account number" : "Show account number"}
+            >
+              {showAccountNumber ? <EyeOffIcon className="size-3.5" /> : <EyeIcon className="size-3.5" />}
+            </button>
+          </div>
         </div>
 
         {/* Balance */}
