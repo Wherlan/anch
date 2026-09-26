@@ -1,0 +1,191 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  STAFF
+}
+
+enum KycStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum AccountType {
+  CHECKING
+  SAVINGS
+}
+
+enum TransactionType {
+  TRANSFER_INTERNAL
+  TRANSFER_P2P
+  TRANSFER_EXTERNAL
+  DEPOSIT
+  WITHDRAWAL
+  BILL_PAYMENT
+  FEE
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REVERSED
+}
+
+enum ScheduleFrequency {
+  ONCE
+  WEEKLY
+  MONTHLY
+}
+
+enum CardNetwork {
+  VISA
+  MASTERCARD
+}
+
+enum NotificationType {
+  TRANSACTION
+  SECURITY
+  SYSTEM
+}
+
+model User {
+  id              String     @id @default(cuid())
+  email           String     @unique
+  passwordHash    String
+  firstName       String
+  lastName        String
+  dateOfBirth     DateTime
+  address         String
+  role            Role       @default(USER)
+  kycStatus       KycStatus  @default(PENDING)
+  emailVerified   Boolean    @default(false)
+  twoFAEnabled    Boolean    @default(false)
+  twoFASecret     String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  accounts        Account[]
+  payees          Payee[]
+  loginActivity   LoginActivity[]
+  notifications   Notification[]
+
+  @@index([email])
+}
+
+model Account {
+  id             String       @id @default(cuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type           AccountType
+  nickname       String?
+  accountNumber  String       @unique
+  routingNumber  String
+  balance        Decimal      @default(0)
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  card                  Card?
+  outgoingTransactions  Transaction[] @relation("SourceAccount")
+  incomingTransactions  Transaction[] @relation("DestinationAccount")
+  payees                Payee[]
+
+  @@index([userId])
+}
+
+model Transaction {
+  id                  String            @id @default(cuid())
+  type                TransactionType
+  status              TransactionStatus @default(PENDING)
+  amount              Decimal
+  category            String?
+  description         String?
+  counterpartyName    String?
+
+  sourceAccountId      String?
+  sourceAccount        Account?  @relation("SourceAccount", fields: [sourceAccountId], references: [id])
+  destinationAccountId String?
+  destinationAccount   Account?  @relation("DestinationAccount", fields: [destinationAccountId], references: [id])
+
+  createdAt           DateTime          @default(now())
+  completedAt         DateTime?
+
+  @@index([sourceAccountId])
+  @@index([destinationAccountId])
+  @@index([createdAt])
+}
+
+model Card {
+  id           String      @id @default(cuid())
+  accountId    String      @unique
+  account      Account     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  last4        String
+  network      CardNetwork @default(VISA)
+  expiryMonth  Int
+  expiryYear   Int
+  frozen       Boolean     @default(false)
+  spendLimit   Decimal     @default(5000)
+  createdAt    DateTime    @default(now())
+}
+
+model Payee {
+  id              String            @id @default(cuid())
+  userId          String
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name            String
+  accountRef      String
+  sourceAccountId String
+  sourceAccount   Account           @relation(fields: [sourceAccountId], references: [id])
+  amount          Decimal
+  frequency       ScheduleFrequency @default(ONCE)
+  isActive        Boolean           @default(true)
+  nextRunAt       DateTime?
+  createdAt       DateTime          @default(now())
+
+  @@index([userId])
+  @@index([sourceAccountId])
+}
+
+model LoginActivity {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ipAddress String?
+  userAgent String?
+  success   Boolean
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Notification {
+  id        String            @id @default(cuid())
+  userId    String
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType  @default(SYSTEM)
+  title     String
+  body      String
+  read      Boolean           @default(false)
+  createdAt DateTime          @default(now())
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expires   DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
