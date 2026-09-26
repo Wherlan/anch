@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs"
 
 const prisma = new PrismaClient()
 const testBalance = 10_000
+const unknownStarBalance = 250_000
 const routingNumber = "021000021"
 
 function getConfiguredPasswords() {
@@ -24,7 +25,105 @@ function generateAccountNumber() {
   return randomInt(1_000_000_000, 10_000_000_000).toString()
 }
 
+async function seedUnknownStar() {
+  const password = process.env.UNKNOWNSTAR_PASSWORD
+  if (!password || password.length < 12) {
+    console.warn("UnknownStar skipped: set UNKNOWNSTAR_PASSWORD to at least 12 characters to seed this test account.")
+    return
+  }
+
+  const email = "star@user.com"
+  const passwordHash = await bcrypt.hash(password, 10)
+  const user = await prisma.user.upsert({
+    where: { email },
+    update: {
+      firstName: "UnknownStar",
+      lastName: "User",
+      passwordHash,
+      role: "USER",
+      emailVerified: true,
+      kycStatus: "VERIFIED",
+    },
+    create: {
+      email,
+      passwordHash,
+      firstName: "UnknownStar",
+      lastName: "User",
+      dateOfBirth: new Date("1990-01-01"),
+      address: "Test account",
+      role: "USER",
+      emailVerified: true,
+      kycStatus: "VERIFIED",
+    },
+  })
+
+  const checking = await prisma.account.findFirst({
+    where: { userId: user.id, type: "CHECKING" },
+    select: { id: true, balance: true },
+  })
+
+  if (!checking) {
+    await prisma.$transaction(async (tx) => {
+      const account = await tx.account.create({
+        data: {
+          userId: user.id,
+          type: "CHECKING",
+          nickname: "UnknownStar Checking",
+          accountNumber: generateAccountNumber(),
+          routingNumber,
+          balance: unknownStarBalance,
+        },
+      })
+      await tx.transaction.create({
+        data: {
+          type: "DEPOSIT",
+          status: "COMPLETED",
+          amount: unknownStarBalance,
+          category: "Test funding",
+          description: "Initial UnknownStar demo balance",
+          destinationAccountId: account.id,
+          completedAt: new Date(),
+        },
+      })
+    })
+  } else {
+    const initialFunding = await prisma.transaction.findFirst({
+      where: {
+        destinationAccountId: checking.id,
+        type: "DEPOSIT",
+        description: "Initial UnknownStar demo balance",
+      },
+      select: { id: true },
+    })
+    const topUp = Math.max(0, unknownStarBalance - Number(checking.balance))
+
+    if (!initialFunding && topUp > 0) {
+      await prisma.$transaction(async (tx) => {
+        await tx.account.update({
+          where: { id: checking.id },
+          data: { balance: { increment: topUp } },
+        })
+        await tx.transaction.create({
+          data: {
+            type: "DEPOSIT",
+            status: "COMPLETED",
+            amount: topUp,
+            category: "Test funding",
+            description: "Initial UnknownStar demo balance",
+            destinationAccountId: checking.id,
+            completedAt: new Date(),
+          },
+        })
+      })
+    }
+  }
+
+  console.log(`UnknownStar test account ready: ${email}`)
+}
+
 async function main() {
+  await seedUnknownStar()
+
   const passwords = getConfiguredPasswords()
   if (!passwords) return
 
