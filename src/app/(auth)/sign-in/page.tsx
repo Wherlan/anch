@@ -69,7 +69,7 @@ export default function SignInPage() {
 
     const result = await signIn("credentials", { email, password, redirect: false })
 
-    if (result?.ok) {
+    if (result?.ok && !result.error) {
       setIsSuccess(true)
       router.push("/dashboard")
     } else {

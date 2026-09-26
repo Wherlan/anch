@@ -65,7 +65,7 @@ async function main() {
 
   const tonyChecking = await prisma.account.findFirst({
     where: { userId: tony.id, type: "CHECKING" },
-    select: { id: true },
+    select: { id: true, balance: true },
   })
 
   if (!tonyChecking) {
@@ -92,6 +92,36 @@ async function main() {
         },
       })
     })
+  } else {
+    const initialFunding = await prisma.transaction.findFirst({
+      where: {
+        destinationAccountId: tonyChecking.id,
+        type: "DEPOSIT",
+        description: "Initial demo account balance",
+      },
+      select: { id: true },
+    })
+    const topUp = Math.max(0, testBalance - Number(tonyChecking.balance))
+
+    if (!initialFunding && topUp > 0) {
+      await prisma.$transaction(async (tx) => {
+        await tx.account.update({
+          where: { id: tonyChecking.id },
+          data: { balance: { increment: topUp } },
+        })
+        await tx.transaction.create({
+          data: {
+            type: "DEPOSIT",
+            status: "COMPLETED",
+            amount: topUp,
+            category: "Test funding",
+            description: "Initial demo account balance",
+            destinationAccountId: tonyChecking.id,
+            completedAt: new Date(),
+          },
+        })
+      })
+    }
   }
 
   await prisma.user.upsert({

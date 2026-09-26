@@ -16,7 +16,7 @@ export default function StaffLoginPage() {
     setLoading(true)
     setError(null)
     const result = await signIn("credentials", { email, password, redirect: false })
-    if (result?.ok) {
+    if (result?.ok && !result.error) {
       router.push("/staff")
     } else {
       setError("Invalid credentials.")

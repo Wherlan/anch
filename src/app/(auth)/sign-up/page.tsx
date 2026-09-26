@@ -86,7 +86,7 @@ export default function SignUpPage() {
 
       setIsSuccess(true)
       const signInResult = await signIn("credentials", { email, password, redirect: false })
-      if (signInResult?.ok) {
+      if (signInResult?.ok && !signInResult.error) {
         router.push("/dashboard")
       } else {
         router.push("/sign-in")
