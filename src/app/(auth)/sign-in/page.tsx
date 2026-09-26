@@ -73,7 +73,11 @@ export default function SignInPage() {
       setIsSuccess(true)
       router.push("/dashboard")
     } else {
-      setError("Invalid email or password.")
+      setError(
+        result?.error === "CredentialsSignin" && result.code === "user_not_found"
+          ? "No user found with that email."
+          : "Invalid email or password."
+      )
       setIsLoading(false)
     }
   }

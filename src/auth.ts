@@ -1,7 +1,12 @@
 import NextAuth from "next-auth"
+import { CredentialsSignin } from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/prisma"
+
+class UserNotFoundError extends CredentialsSignin {
+  code = "user_not_found"
+}
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
@@ -24,7 +29,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const userAgent = request.headers.get("user-agent")
 
         const user = await prisma.user.findUnique({ where: { email } })
-        if (!user) return null
+        if (!user) throw new UserNotFoundError()
 
         const validPassword = await bcrypt.compare(password, user.passwordHash)
 
